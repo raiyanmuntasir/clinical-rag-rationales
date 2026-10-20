@@ -1,0 +1,124 @@
+# Classifier-Guided Retrieval-Augmented Rationale Generation
+
+[![tests](https://github.com/raiyanmuntasir/clinical-rag-rationales/actions/workflows/ci.yml/badge.svg)](https://github.com/raiyanmuntasir/clinical-rag-rationales/actions/workflows/ci.yml)
+![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+**A proof of concept for explaining clinical predictions with retrieved, cited and automatically fact-checked rationales, built from synthetic clinical notes and laboratory data.**
+
+Companion code for the manuscript in preparation:
+
+> Islam, K., Asad, S. M., Hossain, M. S., Hossain, M. A., Monim, R. M., Hussain, M. A., Talha, A., & Kovalanco, D. *Classifier-guided retrieval-augmented rationale generation from synthetic clinical text and laboratory data: A proof-of-concept study.* (in preparation)
+
+The numbers below come from this repository's code and synthetic data. They are not the manuscript's figures.
+
+---
+
+## The idea
+
+A plain RAG system retrieves context using the raw clinical note. Notes are noisy, though: they mix the presenting problem with incidental complaints, negations and overlapping symptoms, so the retrieved guidance is often about the wrong condition.
+
+Here, a **transparent classifier decides first**, and its own evidence drives retrieval:
+
+```
+ note + labs ──► linear classifier ──► prediction + decisive features
+                                              │
+                                              ▼
+                        guided query (condition terms + abnormal labs + decisive tokens)
+                                              │
+                                              ▼
+                       knowledge base (TF-IDF; FAISS index when installed)
+                                              │
+                                              ▼
+           rationale generator (template or LLM) ──► faithfulness checker
+```
+
+The faithfulness checker tests every rationale against the patient record. Stated lab values must match, quoted phrases must appear in the note, and citations must refer to passages that were actually retrieved and are relevant.
+
+## Results
+
+1,500 synthetic patients across 6 classes (diabetes, CKD, anaemia, hypothyroidism, sepsis, no acute finding), split 70/30. Reproduce with `python -m ragx`.
+
+**Classification:** 5-fold CV macro-F1 on the training split, then the held-out test set.
+
+| Input | Macro-F1 |
+|---|---|
+| Note text only (TF-IDF) | 0.881 ± 0.026 |
+| Labs only | 0.896 ± 0.021 |
+| **Fused note + labs** | **0.950 ± 0.019** (held-out test: 0.940) |
+
+**Retrieval:** k = 3 over a 28-passage knowledge base with distractors. Precision@3 is the fraction of retrieved passages about the patient's true condition.
+
+| Query strategy | Precision@3 | Hit@1 |
+|---|---|---|
+| Unguided (raw note) | 0.368 | 0.611 |
+| **Classifier-guided** | **0.763** | **0.936** |
+| Guided with the true class (upper bound) | 0.799 | 0.987 |
+
+Classifier guidance roughly doubles retrieval precision and comes within 0.04 of the oracle upper bound. The remaining gap is caused by classifier errors.
+
+**Rationale faithfulness** (template backend, all 450 test patients): value accuracy 1.00, quote grounding 1.00, citation validity 1.00, citation relevance 0.975. The template backend is grounded by construction, so these numbers check the implementation rather than make a claim. The checker exists to measure the LLM backend, and the test suite confirms it catches fabricated quotes, wrong values and invented citations.
+
+### Example output
+
+```
+> 69-year-old female presents with hypotension, rigors. PMH notable for unremarkable past history.
+  Denies chest pain, cough, abdominal pain.
+Retrieved: KB17 (sepsis), KB21 (reference ranges), KB18 (sepsis)
+
+Assessment: sepsis (model probability 0.99).
+Note evidence: the note documents "rigors", "hypotension" [KB18].
+Lab evidence: WBC 15.63 K/uL (reference 4-11 K/uL) [KB17] [KB21].
+Lab evidence: Lactate 3.6 mmol/L (reference < 2 mmol/L) [KB21].
+Other abnormal results (not explained by the assessment): Creatinine 1.22 mg/dL.
+```
+
+When the model is wrong, the rationale says how weak its basis is instead of inventing support:
+
+```
+> 71yo male, chief complaint: bradycardia, dry skin. PMH notable for prior radioactive iodine therapy.
+Assessment: sepsis (model probability 0.45).
+Caveat: low model confidence (0.45); consider the differential.
+Caveat: no laboratory value supports this assessment; it rests on the note alone and should be confirmed.
+```
+
+More examples, one per class: [`results/examples_template.md`](results/examples_template.md).
+
+## Quick start
+
+```bash
+git clone https://github.com/raiyanmuntasir/clinical-rag-rationales.git
+cd clinical-rag-rationales
+pip install -r requirements.txt          # optional: pip install faiss-cpu anthropic
+
+python -m ragx                           # template backend, full evaluation -> results/
+python -m unittest discover -s tests -t .
+
+# LLM backend: same evidence, generated by an LLM, then fact-checked
+export ANTHROPIC_API_KEY=...             # model can be set with RAGX_MODEL
+python -m ragx --backend llm --n-llm 25  # writes results/summary_llm.json and examples_llm.md
+```
+
+## Layout
+
+```
+ragx/
+  data.py            synthetic notes (noise, negations, overlap, silent notes) + lab panels
+  knowledge_base.py  28 curated criteria passages + distractors (illustrative, not authoritative)
+  classifier.py      TF-IDF ⊕ labs logistic regression with exact per-feature evidence
+  retrieval.py       TF-IDF retriever, optional FAISS index, guided-query construction
+  rationale.py       evidence bundle; template and LLM generators
+  faithfulness.py    value / quote / citation checks
+  cli.py             end-to-end experiment
+```
+
+## Limitations
+
+* All notes, labs and labels are synthetic and template-generated. Real clinical text is far more varied, and the classifier scores here should not be read as real-world performance.
+* The knowledge base is a small set of paraphrased criteria written for this study and has not been clinically validated.
+* The faithfulness checker verifies grounding, not clinical correctness. A rationale can be faithful to a wrong prediction, which is why low-confidence and evidence-free predictions are flagged explicitly.
+* Research prototype. Not for clinical use.
+
+## License
+
+MIT © Raiyan Muntasir Monim

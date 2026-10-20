@@ -1,0 +1,61 @@
+{
+  "data": {
+    "patients": 1500,
+    "train": 1050,
+    "test": 450,
+    "class_counts": {
+      "no_acute_finding": 319,
+      "diabetes": 305,
+      "anemia": 266,
+      "hypothyroidism": 228,
+      "ckd": 195,
+      "sepsis": 187
+    }
+  },
+  "modalities_cv_macro_f1": [
+    {
+      "modality": "text",
+      "macro_f1": 0.8813,
+      "macro_f1_sd": 0.0257
+    },
+    {
+      "modality": "labs",
+      "macro_f1": 0.8957,
+      "macro_f1_sd": 0.0212
+    },
+    {
+      "modality": "fused",
+      "macro_f1": 0.9498,
+      "macro_f1_sd": 0.0194
+    }
+  ],
+  "test_macro_f1_fused": 0.9398,
+  "retrieval": [
+    {
+      "strategy": "unguided (raw note)",
+      "precision@3": 0.3681,
+      "hit@1": 0.6111
+    },
+    {
+      "strategy": "classifier-guided",
+      "precision@3": 0.763,
+      "hit@1": 0.9356
+    },
+    {
+      "strategy": "guided with oracle class (upper bound)",
+      "precision@3": 0.7985,
+      "hit@1": 0.9867
+    }
+  ],
+  "retrieval_index": "numpy",
+  "faithfulness": {
+    "backend": "template",
+    "rationales": 450,
+    "value_accuracy": 1.0,
+    "quote_grounding": 1.0,
+    "citation_validity": 1.0,
+    "citation_relevance": 0.9748,
+    "fully_faithful": 1.0,
+    "mean_citations": 3.26
+  }
+}
