@@ -2,7 +2,6 @@
 
 [![tests](https://github.com/raiyanmuntasir/clinical-rag-rationales/actions/workflows/ci.yml/badge.svg)](https://github.com/raiyanmuntasir/clinical-rag-rationales/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
-![license](https://img.shields.io/badge/license-MIT-green)
 
 **A proof of concept for explaining clinical predictions with retrieved, cited and automatically fact-checked rationales, built from synthetic clinical notes and laboratory data.**
 
@@ -118,7 +117,3 @@ ragx/
 * The knowledge base is a small set of paraphrased criteria written for this study and has not been clinically validated.
 * The faithfulness checker verifies grounding, not clinical correctness. A rationale can be faithful to a wrong prediction, which is why low-confidence and evidence-free predictions are flagged explicitly.
 * Research prototype. Not for clinical use.
-
-## License
-
-MIT © Raiyan Muntasir Monim
